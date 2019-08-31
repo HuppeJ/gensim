@@ -436,8 +436,6 @@ def summarize(text, ratio=0.2, word_count=None, nb_sentences=None, split=False):
         Most representative sentences of given the text.
 
     """
-    #print("Using HuppeJ_Gensim_Project")
-    
     # Gets a list of processed sentences.
     sentences = _clean_text_by_sentences(text)
 
