@@ -64,7 +64,7 @@ from math import log10 as _log10
 from six.moves import range
 
 
-INPUT_MIN_LENGTH = 10
+INPUT_MIN_LENGTH = 2
 
 WEIGHT_THRESHOLD = 1.e-3
 
@@ -250,8 +250,22 @@ def _get_sentences_with_word_count(sentences, word_count):
 
     return selected_sentences
 
+def _get_group_of_best_sentences(sentences, nb_sentences):
+    set_of_selected_sentences = set()
+    # add first sentence
+    set_of_selected_sentences.add(sentences[0])
 
-def _extract_important_sentences(sentences, corpus, important_docs, word_count):
+    i = 1
+    count = 1
+    while count <= nb_sentences and i < len(sentences):
+        if sentences[i] not in set_of_selected_sentences:
+            set_of_selected_sentences.add(sentences[i])
+            count = count + 1
+        i = i + 1
+
+    return list(set_of_selected_sentences)
+
+def _extract_important_sentences(sentences, corpus, important_docs, word_count, nb_sentences):
     """Get most important sentences of the `corpus`.
 
     Parameters
@@ -264,6 +278,8 @@ def _extract_important_sentences(sentences, corpus, important_docs, word_count):
         Most important docs of the corpus.
     word_count : int
         Number of returned words. If None full most important sentences will be returned.
+    nb_sentences : int
+        Number of returned sentences. 
 
     Returns
     -------
@@ -275,10 +291,12 @@ def _extract_important_sentences(sentences, corpus, important_docs, word_count):
 
     # If no "word_count" option is provided, the number of sentences is
     # reduced by the provided ratio. Else, the ratio is ignored.
-    return important_sentences \
-        if word_count is None \
-        else _get_sentences_with_word_count(important_sentences, word_count)
-
+    if word_count is not None:
+        return _get_sentences_with_word_count(important_sentences, word_count)
+    elif nb_sentences is not None: 
+        return _get_group_of_best_sentences(important_sentences, nb_sentences)
+    else:
+        return important_sentences \
 
 def _format_results(extracted_sentences, split):
     """Returns `extracted_sentences` in desired format.
@@ -379,7 +397,7 @@ def summarize_corpus(corpus, ratio=0.2):
     return [list(doc) for doc in hashable_corpus[:int(len(corpus) * ratio)]]
 
 
-def summarize(text, ratio=0.2, word_count=None, split=False):
+def summarize(text, ratio=0.2, word_count=None, nb_sentences=None, split=False):
     """Get a summarized version of the given text.
 
     The output summary will consist of the most representative sentences
@@ -402,7 +420,10 @@ def summarize(text, ratio=0.2, word_count=None, split=False):
         sentences of the original text to be chosen for the summary.
     word_count : int or None, optional
         Determines how many words will the output contain.
-        If both parameters are provided, the ratio will be ignored.
+        If more than one parameter is provided, the parameter selected will be selected in this order: ratio > word_count > nb_sentences
+    nb_sentences: int or None, optional
+        Determines how many sentences will the output contain.
+        If more than one parameter is provided, the parameter selected will be selected in this order: ratio > word_count > nb_sentences
     split : bool, optional
         If True, list of sentences will be returned. Otherwise joined
         strings will bwe returned.
@@ -415,6 +436,8 @@ def summarize(text, ratio=0.2, word_count=None, split=False):
         Most representative sentences of given the text.
 
     """
+    #print("Using HuppeJ_Gensim_Project")
+    
     # Gets a list of processed sentences.
     sentences = _clean_text_by_sentences(text)
 
@@ -432,8 +455,13 @@ def summarize(text, ratio=0.2, word_count=None, split=False):
         logger.warning("Input text is expected to have at least %d sentences.", INPUT_MIN_LENGTH)
 
     corpus = _build_corpus(sentences)
+    
+    # Modified code
+    ratio_value = ratio
+    if word_count is not None or nb_sentences is not None:
+        ratio_value = 1
 
-    most_important_docs = summarize_corpus(corpus, ratio=ratio if word_count is None else 1)
+    most_important_docs = summarize_corpus(corpus, ratio=ratio_value)
 
     # If couldn't get important docs, the algorithm ends.
     if not most_important_docs:
@@ -441,9 +469,11 @@ def summarize(text, ratio=0.2, word_count=None, split=False):
         return [] if split else u""
 
     # Extracts the most important sentences with the selected criterion.
-    extracted_sentences = _extract_important_sentences(sentences, corpus, most_important_docs, word_count)
+    extracted_sentences = _extract_important_sentences(sentences, corpus, most_important_docs, word_count, nb_sentences)
 
     # Sorts the extracted sentences by apparition order in the original text.
-    extracted_sentences.sort(key=lambda s: s.index)
+    # extracted_sentences.sort(key=lambda s: s.index)
 
-    return _format_results(extracted_sentences, split)
+    # return _format_results(extracted_sentences, split)
+
+    return extracted_sentences
